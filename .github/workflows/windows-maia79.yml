@@ -8,6 +8,7 @@ on:
       - 'scripts/patch_lc0.py'
       - 'scripts/smoke_uci.py'
       - '.github/workflows/windows-maia79.yml'
+      - 'requirements-build.txt'
 permissions:
   contents: read
 jobs:
@@ -28,8 +29,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: pip
-          cache-dependency-path: requirements-build.txt
       - name: Checkout pinned LC0 and Maia3
         shell: pwsh
         run: |
