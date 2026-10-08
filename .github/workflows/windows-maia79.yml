@@ -1,0 +1,94 @@
+name: Build LC0 with Maia3-79M (Windows)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'integration/**'
+      - 'scripts/export_maia79.py'
+      - 'scripts/patch_lc0.py'
+      - 'scripts/smoke_uci.py'
+      - '.github/workflows/windows-maia79.yml'
+permissions:
+  contents: read
+jobs:
+  windows-maia79:
+    name: Compile native backend and run Maia3-79M
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      LC0_REVISION: af8ae6af504e61cca4c1481486c5b07fc02d705e
+      MAIA_REVISION: 1e13597c42d4858b7cfd7cfdae01e297263364b2
+      ORT_VERSION: 1.20.1
+    steps:
+      - name: Checkout integration repository
+        uses: actions/checkout@v4
+      - name: Enable MSVC toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Configure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+      - name: Checkout pinned LC0 and Maia3
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force upstream | Out-Null
+          git clone --recursive https://github.com/LeelaChessZero/lc0.git upstream/lc0
+          git -C upstream/lc0 checkout $env:LC0_REVISION
+          git -C upstream/lc0 submodule update --init --recursive
+          git clone https://github.com/CSSLab/maia3.git upstream/maia3
+          git -C upstream/maia3 checkout $env:MAIA_REVISION
+      - name: Install Python build and Maia3 packages
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+          python -m pip install -e upstream/maia3
+      - name: Export original pretrained Maia3-79M to verified ONNX
+        shell: pwsh
+        run: python scripts/export_maia79.py --output "$env:GITHUB_WORKSPACE/maia3-79m.onnx"
+      - name: Download official ONNX Runtime CPU SDK
+        shell: pwsh
+        run: |
+          $url = "https://github.com/microsoft/onnxruntime/releases/download/v$env:ORT_VERSION/onnxruntime-win-x64-$env:ORT_VERSION.zip"
+          Invoke-WebRequest -Uri $url -OutFile ort.zip
+          Expand-Archive -Path ort.zip -DestinationPath ort
+          $sdk = (Get-ChildItem ort -Directory | Select-Object -First 1).FullName
+          "ORT_DIR=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Apply Maia3 integration to official LC0
+        shell: pwsh
+        run: python scripts/patch_lc0.py --lc0 upstream/lc0
+      - name: Configure Meson with ONNX Runtime
+        shell: pwsh
+        working-directory: upstream/lc0
+        run: |
+          meson setup build-maia --buildtype=release -Db_lto=false -Dbuild_backends=false -Dgtest=false -Ddefault_backend=maia79 "-Donnx_libdir=$env:ORT_DIR/lib" "-Donnx_include=$env:ORT_DIR/include"
+      - name: Compile Windows x64 LC0-Maia79
+        shell: pwsh
+        working-directory: upstream/lc0
+        run: meson compile -C build-maia
+      - name: Assemble distributable files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-ChildItem upstream/lc0/build-maia -Filter lc0.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Compiled lc0.exe not found" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item $exe.FullName dist/lc0-maia79.exe
+          Copy-Item "$env:ORT_DIR/lib/onnxruntime.dll" dist/
+          Copy-Item maia3-79m.onnx dist/
+          Copy-Item upstream/lc0/COPYING dist/LC0-COPYING.txt -ErrorAction SilentlyContinue
+          Copy-Item upstream/maia3/LICENSE dist/MAIA3-LICENSE.txt
+          Copy-Item docs/RUN-WINDOWS.md dist/README-WINDOWS.md
+      - name: Check actual Maia3 inference through LC0 UCI
+        shell: pwsh
+        working-directory: dist
+        run: python ../scripts/smoke_uci.py --exe "./lc0-maia79.exe" --model "./maia3-79m.onnx"
+      - name: Upload verified Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LC0-Maia3-79M-Windows-x64
+          path: dist/
+          if-no-files-found: error
+          compression-level: 0
