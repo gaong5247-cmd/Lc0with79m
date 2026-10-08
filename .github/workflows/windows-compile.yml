@@ -1,0 +1,54 @@
+name: Quick Windows C++ Compile Check
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'integration/**'
+      - 'scripts/patch_lc0.py'
+      - '.github/workflows/windows-compile.yml'
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install compiler helpers
+        shell: pwsh
+        run: python -m pip install meson ninja
+      - name: Checkout upstream LC0 pinned revision
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force upstream | Out-Null
+          git clone --recursive https://github.com/LeelaChessZero/lc0.git upstream/lc0
+          git -C upstream/lc0 checkout af8ae6af504e61cca4c1481486c5b07fc02d705e
+          git -C upstream/lc0 submodule update --init --recursive
+      - name: Install ONNX Runtime native SDK
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-win-x64-1.20.1.zip" -OutFile ort.zip
+          Expand-Archive ort.zip ort
+          $sdk = (Get-ChildItem ort -Directory | Select-Object -First 1).FullName
+          "ORT_DIR=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Overlay Maia backend
+        run: python scripts/patch_lc0.py --lc0 upstream/lc0
+      - name: Configure
+        working-directory: upstream/lc0
+        shell: pwsh
+        run: meson setup build-maia --buildtype=release -Db_lto=false -Dbuild_backends=false -Dgtest=false -Ddefault_backend=maia79 "-Donnx_libdir=$env:ORT_DIR/lib" "-Donnx_include=$env:ORT_DIR/include"
+      - name: Compile
+        working-directory: upstream/lc0
+        run: meson compile -C build-maia
+      - name: Verify UCI registration
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem upstream/lc0/build-maia -Filter lc0.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw 'No LC0 executable generated' }
+          Copy-Item "$env:ORT_DIR/lib/onnxruntime.dll" $exe.Directory.FullName
+          $output = 'uci' | & $exe.FullName --backend=random --weights=
+          if ("$output" -notmatch 'maia79') { throw "Maia backend not in UCI backend choices: $output" }
