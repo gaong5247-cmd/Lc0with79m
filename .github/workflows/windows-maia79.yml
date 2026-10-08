@@ -75,6 +75,9 @@ jobs:
           if (-not $exe) { throw "Compiled lc0.exe not found" }
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item $exe.FullName dist/lc0-maia79.exe
+          $zlib = Get-ChildItem upstream/lc0/build-maia -Recurse -File -Filter "z.dll" | Select-Object -First 1
+          if (-not $zlib) { throw "LC0 zlib DLL z.dll not found in build tree" }
+          Copy-Item $zlib.FullName dist/z.dll
           Get-ChildItem "$env:ORT_DIR/lib" -Filter "*.dll" | Copy-Item -Destination dist/
           Copy-Item maia3-79m.onnx dist/
           Copy-Item upstream/lc0/COPYING dist/LC0-COPYING.txt -ErrorAction SilentlyContinue
