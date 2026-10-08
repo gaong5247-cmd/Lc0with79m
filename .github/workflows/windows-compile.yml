@@ -50,5 +50,5 @@ jobs:
         run: |
           $exe = Get-ChildItem upstream/lc0/build-maia -Filter lc0.exe -Recurse | Select-Object -First 1
           if (-not $exe) { throw 'No LC0 executable generated' }
-          Copy-Item "$env:ORT_DIR/lib/onnxruntime.dll" $exe.Directory.FullName
+          Get-ChildItem "$env:ORT_DIR/lib" -Filter "*.dll" | Copy-Item -Destination $exe.Directory.FullName
           python scripts/smoke_registration.py $exe.FullName
