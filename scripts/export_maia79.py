@@ -15,6 +15,12 @@ from maia3.model_registry import resolve_model_spec, resolve_checkpoint_path
 from maia3.models import MAIA3Model
 
 
+def _rmsnorm_onnx_compatible(self, x):
+    # PyTorch aten::rms_norm is not supported in legacy ONNX export.
+    eps = self.eps if self.eps is not None else torch.finfo(x.dtype).eps
+    return x * torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True) + eps) * self.weight
+
+
 def export(output: Path, *, checkpoint: str | None = None) -> None:
     spec = resolve_model_spec("maia3-79m")
     cfg = SimpleNamespace(**spec.config)
@@ -37,7 +43,10 @@ def export(output: Path, *, checkpoint: str | None = None) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with torch.no_grad():
         reference = model(tokens, self_elo, oppo_elo)
-        torch.onnx.export(
+        original_rms_forward = torch.nn.RMSNorm.forward
+        torch.nn.RMSNorm.forward = _rmsnorm_onnx_compatible
+        try:
+            torch.onnx.export(
             model,
             (tokens, self_elo, oppo_elo),
             str(output),
@@ -47,7 +56,9 @@ def export(output: Path, *, checkpoint: str | None = None) -> None:
             do_constant_folding=True,
             dynamo=False,
             external_data=False,
-        )
+            )
+        finally:
+            torch.nn.RMSNorm.forward = original_rms_forward
     graph = onnx.load(str(output))
     onnx.checker.check_model(graph)
     session = ort.InferenceSession(str(output), providers=["CPUExecutionProvider"])
