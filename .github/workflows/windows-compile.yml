@@ -55,3 +55,25 @@ jobs:
           if (-not $zlib) { throw "LC0 zlib DLL not found" }
           Copy-Item $zlib.FullName $exe.Directory.FullName
           python scripts/smoke_registration.py $exe.FullName
+
+      - name: Package Windows engine-only build
+        if: success()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-ChildItem upstream/lc0/build-maia -Filter lc0.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Windows EXE not found" }
+          New-Item -ItemType Directory -Force engine-only | Out-Null
+          Copy-Item $exe.FullName engine-only/lc0-maia79.exe
+          $zlib = Get-ChildItem upstream/lc0/build-maia -Recurse -File -Filter "z.dll" | Select-Object -First 1
+          if (-not $zlib) { throw "Required z.dll missing" }
+          Copy-Item $zlib.FullName engine-only/
+          Get-ChildItem "$env:ORT_DIR/lib" -Filter "*.dll" | Copy-Item -Destination engine-only/
+          Set-Content -Path engine-only/NO-MODEL-INCLUDED.txt -Value "Engine-only validation build. Download the verified Maia3-79M model from a successful full workflow to play chess." -Encoding utf8
+      - name: Upload Windows engine-only artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LC0-Maia79-Windows-Engine-Only-NO-MODEL
+          path: engine-only/
+          if-no-files-found: error
