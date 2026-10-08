@@ -178,9 +178,10 @@ class MaiaComputation final : public BackendComputation {
 
       // Value head is W/D/L from the current side-to-move's perspective.
       const float vmax = std::max({value[0], value[1], value[2]});
-      const double w = std::exp(double(value[0] - vmax));
+      // Maia3 labels value logits [loss, draw, win], unlike UCI [W,D,L].
+      const double w = std::exp(double(value[2] - vmax));
       const double d = std::exp(double(value[1] - vmax));
-      const double l = std::exp(double(value[2] - vmax));
+      const double l = std::exp(double(value[0] - vmax));
       const double denom = w + d + l;
       if (!std::isfinite(denom) || denom <= 0.0)
         throw std::runtime_error("Maia returned invalid WDL probabilities");
