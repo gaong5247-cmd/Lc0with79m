@@ -5,6 +5,7 @@ on:
     paths:
       - 'integration/**'
       - 'scripts/patch_lc0.py'
+      - 'scripts/smoke_registration.py'
       - '.github/workflows/windows-compile.yml'
 permissions:
   contents: read
@@ -50,5 +51,4 @@ jobs:
           $exe = Get-ChildItem upstream/lc0/build-maia -Filter lc0.exe -Recurse | Select-Object -First 1
           if (-not $exe) { throw 'No LC0 executable generated' }
           Copy-Item "$env:ORT_DIR/lib/onnxruntime.dll" $exe.Directory.FullName
-          $output = 'uci' | & $exe.FullName --backend=random --weights=
-          if ("$output" -notmatch 'maia79') { throw "Maia backend not in UCI backend choices: $output" }
+          python scripts/smoke_registration.py $exe.FullName
