@@ -40,6 +40,17 @@ def patch(repository: Path, lc0: Path):
         raise RuntimeError("Unsupported upstream LC0 meson.build layout")
     original = original.replace(marker, MESON_FRAGMENT + "\n" + marker, 1)
     meson.write_text(original, encoding="utf-8")
+    # Upstream LC0 auto-discovers any large file in EXE's folder and may try
+    # parsing Maia .onnx as an LC0 protobuf weights file. Disable that
+    # default for this dedicated Maia79 build only.
+    shared = lc0 / "src" / "neural" / "shared_params.cc"
+    original_shared = shared.read_text(encoding="utf-8")
+    old = 'options->Add<StringOption>(SharedBackendParams::kWeightsId) = kAutoDiscover;'
+    new = 'options->Add<StringOption>(SharedBackendParams::kWeightsId) = "";'
+    if old not in original_shared and new not in original_shared:
+        raise RuntimeError("Cannot patch upstream LC0 weights auto-discovery")
+    if old in original_shared:
+        shared.write_text(original_shared.replace(old, new, 1), encoding="utf-8")
     print(f"Patched LC0 source tree: {lc0}")
 
 
