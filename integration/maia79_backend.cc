@@ -20,6 +20,7 @@
 #include "neural/backend.h"
 #include "neural/register.h"
 #include "neural/shared_params.h"
+#include "utils/commandline.h"
 #include "utils/optionsdict.h"
 #include "onnxruntime_cxx_api.h"
 
@@ -101,7 +102,11 @@ struct Model {
     Ort::SessionOptions opts;
     opts.SetIntraOpNumThreads(1);
     opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-    const auto native = std::filesystem::path(path).native();
+    auto model_file = std::filesystem::path(path);
+    if (model_file.is_relative() && !std::filesystem::exists(model_file)) {
+      model_file = std::filesystem::path(CommandLine::BinaryDirectory()) / model_file;
+    }
+    const auto native = model_file.native();
     session = Ort::Session(env, native.c_str(), opts);
     if (session.GetInputCount() != 3 || session.GetOutputCount() < 2)
       throw std::runtime_error("Maia ONNX must have 3 inputs and >=2 outputs");
