@@ -75,11 +75,17 @@ jobs:
           if (-not $exe) { throw "Compiled lc0.exe not found" }
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item $exe.FullName dist/lc0-maia79.exe
-          Copy-Item "$env:ORT_DIR/lib/onnxruntime.dll" dist/
+          Get-ChildItem "$env:ORT_DIR/lib" -Filter "*.dll" | Copy-Item -Destination dist/
           Copy-Item maia3-79m.onnx dist/
           Copy-Item upstream/lc0/COPYING dist/LC0-COPYING.txt -ErrorAction SilentlyContinue
           Copy-Item upstream/maia3/LICENSE dist/MAIA3-LICENSE.txt
           Copy-Item docs/RUN-WINDOWS.md dist/README-WINDOWS.md
+      - name: Diagnose executable DLL dependencies
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -Filter "*.dll" | Select-Object Name, Length
+          dumpbin /dependents dist/lc0-maia79.exe
+          dumpbin /dependents dist/onnxruntime.dll
       - name: Check actual Maia3 inference through LC0 UCI
         shell: pwsh
         working-directory: dist
