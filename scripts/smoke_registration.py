@@ -22,7 +22,7 @@ def main(exe):
             try:
                 line = lines.get(timeout=25)
             except queue.Empty:
-                raise RuntimeError("Timed out requesting UCI registration")
+                raise RuntimeError(f"Timed out requesting UCI registration; process return code={proc.poll()}, hex={((proc.poll() or 0)&0xffffffff):08X}")
             print(line, flush=True)
             all_lines.append(line)
             if line == "uciok":
