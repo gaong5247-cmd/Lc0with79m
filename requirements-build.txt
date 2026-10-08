@@ -1,0 +1,8 @@
+meson>=1.2
+ninja>=1.11
+torch>=2.3,<3
+onnx>=1.16
+onnxruntime>=1.18
+numpy>=1.26
+huggingface-hub>=0.23
+python-chess>=1.999
