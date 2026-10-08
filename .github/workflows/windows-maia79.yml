@@ -93,10 +93,11 @@ jobs:
         shell: pwsh
         working-directory: dist
         run: python ../scripts/smoke_uci.py --exe "./lc0-maia79.exe" --model "./maia3-79m.onnx"
-      - name: Upload verified Windows artifact
+      - name: Upload Windows build files even when runtime tests fail
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: LC0-Maia3-79M-Windows-x64
+          name: LC0-Maia3-79M-Windows-x64-UNVERIFIED
           path: dist/
           if-no-files-found: error
           compression-level: 0
