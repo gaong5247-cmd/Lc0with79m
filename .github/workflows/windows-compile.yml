@@ -51,4 +51,7 @@ jobs:
           $exe = Get-ChildItem upstream/lc0/build-maia -Filter lc0.exe -Recurse | Select-Object -First 1
           if (-not $exe) { throw 'No LC0 executable generated' }
           Get-ChildItem "$env:ORT_DIR/lib" -Filter "*.dll" | Copy-Item -Destination $exe.Directory.FullName
+          $zlib = Get-ChildItem upstream/lc0/build-maia -Recurse -File -Filter "z.dll" | Select-Object -First 1
+          if (-not $zlib) { throw "LC0 zlib DLL not found" }
+          Copy-Item $zlib.FullName $exe.Directory.FullName
           python scripts/smoke_registration.py $exe.FullName
