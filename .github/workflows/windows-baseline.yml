@@ -1,0 +1,37 @@
+name: Windows LC0 Baseline
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/windows-baseline.yml'
+      - 'scripts/bootstrap-upstreams.ps1'
+jobs:
+  baseline:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone official LC0 and Maia3
+        shell: pwsh
+        run: ./scripts/bootstrap-upstreams.ps1
+      - name: Install Meson and Ninja
+        run: python -m pip install meson ninja
+      - name: Configure upstream LC0 with random backend (baseline only)
+        shell: pwsh
+        working-directory: upstream/lc0
+        run: meson setup build-baseline --buildtype=release -Dbuild_backends=false -Dgtest=false
+      - name: Compile upstream LC0 baseline
+        shell: pwsh
+        working-directory: upstream/lc0
+        run: meson compile -C build-baseline
+      - name: Locate executable
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem upstream/lc0/build-baseline -Filter lc0.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw 'lc0.exe not found' }
+          New-Item -ItemType Directory -Force artifact | Out-Null
+          Copy-Item $exe.FullName artifact/lc0-baseline.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LC0-Windows-Baseline-NO-MAIA
+          path: artifact/lc0-baseline.exe
+          if-no-files-found: error
