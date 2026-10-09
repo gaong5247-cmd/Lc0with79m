@@ -126,8 +126,15 @@ class MaiaComputation final : public BackendComputation {
   size_t UsedBatchSize() const override { return pending_.size(); }
 
   AddInputResult AddInput(const EvalPosition& pos, EvalResultPtr result) override {
-    if (result.p.size() != pos.legal_moves.size())
-      throw std::runtime_error("Maia: legal move/output size mismatch");
+    // LC0 search prefetch passes EvalResultPtr{} because it only wants to
+    // populate a backend cache. This backend does not implement a cache:
+    // never enqueue a task with no output storage (which would otherwise
+    // fail the size check or dereference a null output destination).
+    if (!result.q && !result.d && !result.m && result.p.empty()) {
+      return FETCHED_IMMEDIATELY;
+    }
+    if (!result.q || !result.d || result.p.size() != pos.legal_moves.size())
+      throw std::runtime_error("Maia: invalid search evaluation output buffer");
     Pending task;
     task.tokens = Tokenize(pos.pos);
     task.dest = result;
