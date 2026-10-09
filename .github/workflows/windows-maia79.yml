@@ -92,7 +92,12 @@ jobs:
       - name: Check actual Maia3 inference through LC0 UCI
         shell: pwsh
         working-directory: dist
-        run: python ../scripts/smoke_uci.py --exe "./lc0-maia79.exe" --model "./maia3-79m.onnx"
+        run: python ../scripts/smoke_uci.py --exe "./lc0-maia79.exe" --model "./maia3-79m.onnx" --nodes 1 --timeout 90
+      - name: Regression test Maia3 search with go nodes 3000
+        shell: pwsh
+        working-directory: dist
+        timeout-minutes: 35
+        run: python ../scripts/smoke_uci.py --exe "./lc0-maia79.exe" --model "./maia3-79m.onnx" --nodes 3000 --timeout 2000
       - name: Upload verified Windows engine with Maia3-79M model
         if: success()
         uses: actions/upload-artifact@v4
