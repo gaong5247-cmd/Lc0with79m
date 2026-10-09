@@ -12,7 +12,7 @@ def run(executable: str, model: str) -> None:
             executable,
             "--backend=maia79",
             "--weights=",
-            f"--backend-opts=model={model},selfelo=2600,oppoelo=2600",
+            f'--backend-opts=model="{model}",selfelo=2600,oppoelo=2600',
             "--threads=1",
         ],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -48,6 +48,8 @@ def run(executable: str, model: str) -> None:
                     raise RuntimeError(f"Engine stopped unexpectedly: {proc.returncode}")
                 continue
             print(line, flush=True)
+            if line.startswith("error ") or line.startswith("fatal "):
+                raise RuntimeError(f"LC0 reported an error: {line}")
             if line == "uciok":
                 seen_uci = True
             if line == "readyok":
